@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<div id="info">HW3
+<br>
+  <button id="change" style="width:20%">change view</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://rawgit.com/jyunming-chen/tutsplus/master/js/text2D.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script>
+var camera, camera2, scene, renderer, mesh, controls;
+var sceneHUD, cameraHUD;
+var keyboard = new KeyboardState();
+var clock;
+
+var pos = new THREE.Vector3(0, 0, 65);
+var vel = new THREE.Vector3();
+var force = new THREE.Vector3();
+var power, angle;
+var spriteV;
+var scooter = [];
+var change = true;
+
+(function() {
+  Math.clamp = function(val,min,max){
+    return Math.min(Math.max(val,min),max);
+    
+  }})();
+  
+init();
+animate();
+$("#change").click(function() {
+  change = !change;
+});
+
+function tireC(){
+	var loader = new THREE.TextureLoader();
+  loader.crossOrigin = '';
+
+  var tireAssembly = new THREE.Object3D();
+
+  var treadTex = loader.load('https://i.imgur.com/21rKfjX.jpg?2');
+  treadTex.repeat.set(6, 1)
+  treadTex.wrapS = THREE.RepeatWrapping
+  var treadMat = new THREE.MeshBasicMaterial({
+    map: treadTex,
+    side: THREE.DoubleSide
+  });
+  var geometry = new THREE.CylinderGeometry(1, 1, 0.5, 80, 2, true)
+  var tread = new THREE.Mesh(geometry, treadMat);
+  // parameters need to be set in initial instantiation  
+  tireAssembly.add(tread)
+
+  var tireTex = loader.load('https://i.imgur.com/jPX4y1n.png?1');
+  var tireMat = new THREE.MeshBasicMaterial({
+    map: tireTex,
+    transparent: true,
+    side: THREE.DoubleSide
+  })
+  var tire = new THREE.Mesh(new THREE.CircleGeometry(1, 80), tireMat)
+  var tire1 = tire.clone();
+  tireAssembly.add(tire1)
+  tire1.rotation.x = -Math.PI / 2;
+  tire1.position.y = 0.25
+  var tire2 = tire.clone();
+  tire2.rotation.x = Math.PI / 2
+  tire2.position.y = -0.25
+  tireAssembly.add(tire2)
+  return tireAssembly;
+
+}
+
+function buildVehicle() {
+  //var tire1 = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.5, 20), new THREE.MeshBasicMaterial({map: textureTire}));
+  var tire1 = tireC();
+  var tire2 = tire1.clone();
+  tire1.rotation.x = Math.PI / 2;
+  tire2.rotation.x = Math.PI / 2;
+  tire2.position.x = -5;
+  
+  tire1.position.set(2.5, -2, 0);
+  tire2.position.set(-2.5, -2, 0);
+  var body = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 1), new THREE.MeshBasicMaterial({color: 0x00ffff}));
+  //scooter.add(tire1, tire2);
+  body.add(tire1, tire2)
+  
+  return [body, tire1, tire2];
+}
+
+function init() {
+
+  clock = new THREE.Clock();
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 1, 1500);
+  camera.position.y = 500;
+  camera.position.z = 500;
+  camera.lookAt(new THREE.Vector3())
+  scene.add(camera);
+  
+  camera2 = new THREE.PerspectiveCamera(20, window.innerWidth / window.innerHeight, 1, 1000);
+  //HUD camera
+  cameraHUD = new THREE.OrthographicCamera(-10, 10, 10, -10, -10, 1600);
+  cameraHUD.position.z = 1580;
+  
+  //HUD scene
+  sceneHUD = new THREE.Scene();
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  
+  controls.enableKeys = false;
+  
+  document.body.appendChild(renderer.domElement);
+  ////////////////////////////////////////////////////////////////////////
+  power = 5.0;
+  angle = 0.0;
+  	
+  scooter = buildVehicle();
+  scooter[0].position.set(0, 3, 65)
+  scene.add(scooter[0]);
+  scooter[0].add(camera2)
+  camera2.position.set(-50, 5, 0)
+  camera2.rotation.y = -Math.PI / 2
+  
+  var SpriteText2D = THREE_Text.SpriteText2D;
+  var textAlign = THREE_Text.textAlign;
+  spriteV = new SpriteText2D("Speed", {
+    align: textAlign.center,
+    font: '30px Arial',
+    fillStyle: '#ffff00',
+    antialias: true
+  });
+  spriteV.position.set(7, -8, 400);
+  spriteV.scale.set(0.03, 0.03, 0.03);
+  sceneHUD.add(spriteV);
+  
+  //button g=speed up r=speed down
+  var button1 = new THREE.Mesh(new THREE.CircleGeometry(1, 60), new THREE.MeshBasicMaterial({color: 0x00ff00, depthTest: false}));
+  var button2 = new THREE.Mesh(new THREE.CircleGeometry(1, 60), new THREE.MeshBasicMaterial({color: 0xff0000, depthTest: false}));
+  button1.position.set(-8, -8, 0);
+  button2.position.set(-5, -8, 0);
+  sceneHUD.add(button1, button2)
+  
+  document.addEventListener('mousedown', hudButtonPick, false);
+  
+  //road
+  var loader = new THREE.TextureLoader();
+  loader.crossOrigin = '';
+  var roadTex = loader.load('https://i.imgur.com/gr9xu18.jpg');
+  roadTex.wrapS = roadTex.wrapT = THREE.RepeatWrapping;
+  
+  var road = new THREE.Mesh(new THREE.PlaneGeometry(162, 132), new THREE.MeshBasicMaterial({map: roadTex}))
+  road.rotation.x = -Math.PI / 2;
+  scene.add(road)
+  
+  //block
+  var block1Tex = loader.load('https://i.imgur.com/OmVvgZz.jpg');
+  block1Tex.wrapS = block1Tex.wrapT = THREE.RepeatWrapping;
+  block1Tex.repeat.set(3, 12)
+  var block1 = new THREE.Mesh(new THREE.PlaneGeometry(32, 120), new THREE.MeshBasicMaterial({map: block1Tex}))
+  block1.position.set(-59, 0.3, 0);
+  
+  var block2Tex = loader.load('https://i.imgur.com/OmVvgZz.jpg');
+  block2Tex.wrapS = block2Tex.wrapT = THREE.RepeatWrapping;
+  block2Tex.repeat.set(10, 2)
+  var block2 = new THREE.Mesh(new THREE.PlaneGeometry(112, 40), new THREE.MeshBasicMaterial({map: block2Tex}))
+  block2.position.set(19, 0.3, 40);
+  
+  var block3Tex = loader.load('https://i.imgur.com/OmVvgZz.jpg');
+  block3Tex.wrapS = block3Tex.wrapT = THREE.RepeatWrapping;
+  block3Tex.repeat.set(4.5, 3)
+  var block3 = new THREE.Mesh(new THREE.PlaneGeometry(56, 36), new THREE.MeshBasicMaterial({map: block3Tex}))
+  block3.position.set(-9, 0.3, -4);
+  
+  var block4Tex = loader.load('https://i.imgur.com/T1tLQRv.jpg');
+  block4Tex.wrapS = block4Tex.wrapT = THREE.RepeatWrapping;
+  block4Tex.repeat.set(2.6, 2)
+  var block4 = new THREE.Mesh(new THREE.PlaneGeometry(50, 36), new THREE.MeshBasicMaterial({map: block4Tex}))
+  block4.position.set(50, 0.3, -4);
+  
+  var block5Tex = loader.load('https://i.imgur.com/OmVvgZz.jpg');
+  block5Tex.wrapS = block5Tex.wrapT = THREE.RepeatWrapping;
+  block5Tex.repeat.set(7, 2)
+  var block5 = new THREE.Mesh(new THREE.PlaneGeometry(112, 32), new THREE.MeshBasicMaterial({map: block5Tex}))
+  block5.position.set(19, 0.3, -44);
+  
+  block1.rotation.x = block2.rotation.x = block3.rotation.x = block4.rotation.x = block5.rotation.x = -Math.PI / 2;
+  scene.add(block1, block2, block3, block4, block5)
+  
+  //building
+  var subway = new THREE.Mesh(new THREE.BoxGeometry(20, 21, 28), new THREE.MeshNormalMaterial())
+  subway.position.set(-61, 10.53, 34)
+  
+  var dehuiOld = new THREE.Mesh(new THREE.BoxGeometry(24, 30, 36), new THREE.MeshNormalMaterial())
+  dehuiOld.position.set(7, 15.03, -4)
+  
+  var dehuiNew = new THREE.Mesh(new THREE.BoxGeometry(56, 30, 24), new THREE.MeshNormalMaterial())
+  dehuiNew.position.set(9, 15.03, 44)
+  
+  scene.add(subway, dehuiOld, dehuiNew)
+  
+  //sign
+  var Text2D = THREE_Text.MeshText2D;
+  var subwaySign = new Text2D("SUBWAY", {
+    align: textAlign.center,
+    font: '30px Arial',
+    fillStyle: '#00ff00',
+    antialias: false
+  });
+  subwaySign.position.set(-71.5, 10.53, 35);
+  subwaySign.rotation.y = -Math.PI / 2
+  subwaySign.scale.set(0.15, 0.15, 0.15);
+  
+  var dehuiOldSign = new Text2D("ÂÂ¼w´f", {
+    align: textAlign.center,
+    font: '30px Arial',
+    fillStyle: '#ff0000',
+    antialias: false
+  });
+  dehuiOldSign.position.set(7, 20, 14.5);
+  dehuiOldSign.scale.set(0.28, 0.28, 0.28);
+  
+  var dehuiNewSign = new Text2D("·s¼w´f", {
+    align: textAlign.center,
+    font: '30px Arial',
+    fillStyle: '#0000ff',
+    antialias: false
+  });
+  dehuiNewSign.position.set(7, 20, 56.5);
+  dehuiNewSign.scale.set(0.28, 0.28, 0.28);
+  
+  scene.add(subwaySign, dehuiOldSign, dehuiNewSign)
+  
+  //yellow line
+  var line1 = new THREE.Mesh(new THREE.PlaneGeometry(32, 0.5), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line1.position.set(-59, 0.3, 62.75)
+  var line2 = line1.clone()
+  line2.position.set(-59, 0.3, -62.75)
+  
+  var line3 = new THREE.Mesh(new THREE.PlaneGeometry(112, 0.5), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line3.position.set(19, 0.3, 62.75)
+  var line4 = line3.clone();
+  line4.position.set(19, 0.3, -62.75)
+  
+  var line5 = new THREE.Mesh(new THREE.PlaneGeometry(56, 0.5), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line5.position.set(-9, 0.3, -24.75)
+  var line6 = line5.clone()
+  line6.position.set(-9, 0.3, 17.25)
+  
+  var line7 = new THREE.Mesh(new THREE.PlaneGeometry(50, 0.5), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line7.position.set(50, 0.3, -24.75)
+  var line8 = line7.clone()
+  line8.position.set(50, 0.3, 17.25)
+  
+  var line9 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 32), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line9.position.set(-39.75, 0.3, -44)
+  var line10 = line9.clone()
+  line10.position.set(77.75, 0.3, -44)
+  
+  var line11 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 36), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line11.position.set(-39.75, 0.3, -4)
+  var line12 = line11.clone()
+  line12.position.set(77.75, 0.3, -4)
+  
+  var line13 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 40), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line13.position.set(-39.75, 0.3, 40)
+  var line14 = line13.clone()
+  line14.position.set(77.75, 0.3, 40)
+  
+  var line15 = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 120), new THREE.MeshBasicMaterial({color: 0xffff00}))
+  line15.position.set(-77.75, 0.3, 0)
+  var line16 = line11.clone();
+  line16.position.set(22.25, 0.3, -4)
+  
+  line1.rotation.x = line2.rotation.x = line3.rotation.x = line4.rotation.x = line5.rotation.x = line6.rotation.x = line7.rotation.x = line8.rotation.x = line9.rotation.x = line10.rotation.x = line11.rotation.x = line12.rotation.x = line13.rotation.x = line14.rotation.x = line15.rotation.x = line16.rotation.x = -Math.PI / 2
+  scene.add(line1, line2, line3, line4, line5, line6, line7, line8, line9, line10, line11, line12, line13, line14, line15, line16)
+  //autoClean off
+  renderer.autoClear = false;
+
+}
+
+function hudButtonPick (event) {
+	// convert to NDC
+	var ndcX = (event.clientX / window.innerWidth) * 2 - 1;
+  var ndcY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+	// convert to HUD scene coordinate
+  var halfW = cameraHUD.right;
+  var halfH = cameraHUD.top;
+  var xx = ndcX * halfW;
+  var yy = ndcY * halfH;
+
+  var button1Center = new THREE.Vector2 (-8, -8);
+  var button2Center = new THREE.Vector2 (-5, -8);
+  var mouse = new THREE.Vector2 (xx, yy);
+  if (mouse.distanceTo (button1Center) < 1)
+  	power *= 1.2;
+  else if(mouse.distanceTo (button2Center) < 1)
+  	power /= 1.2;
+  
+
+}
+
+function update(dt) {
+
+  keyboard.update();
+  
+  if (vel.length() > 0) {
+    angle = Math.atan2(-vel.z, vel.x); // update orientation
+  }
+
+  if (keyboard.pressed("space"))  
+ 	  power = 0.1;               
+  if (keyboard.pressed("up"))  
+ 	  power *= 1.2;        
+  if (keyboard.pressed("down"))  
+ 	  power /= 1.2;   
+ 	
+  power = Math.clamp (power, 0, 80.0); 
+  
+  
+  var angle_thrust = angle;
+  if (keyboard.pressed("left"))
+    angle_thrust += 0.3;
+  if (keyboard.pressed("right"))
+    angle_thrust -= 0.3;
+    
+  // compute force
+  var thrust = new THREE.Vector3(1,0,0).multiplyScalar(power).applyAxisAngle       (new THREE.Vector3(0,1,0), angle_thrust);
+  force.copy (thrust);
+  force.add(vel.clone().multiplyScalar(-2))
+
+  // eulers
+  vel.add(force.clone().multiplyScalar(dt));
+  pos.add(vel.clone().multiplyScalar(dt));
+  spriteV.text = 'Speed ' + Math.sqrt(vel.x * vel.x + vel.y * vel.y).toFixed(2);
+  
+}
+
+function animate() {
+
+  controls.update();
+
+  var dt = clock.getDelta();
+  update(dt);
+
+  // car update
+  scooter[0].position.copy(pos);
+  scooter[0].position.y += 3;
+  scooter[0].rotation.y = angle;
+  scooter[1].rotation.y -= Math.sqrt(vel.x * vel.x + vel.y * vel.y) / (2 * Math.PI) / (2 * Math.PI)
+  scooter[2].rotation.y -= Math.sqrt(vel.x * vel.x + vel.y * vel.y) / (2 * Math.PI) / (2 * Math.PI)
+  
+  
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+	var cameraC;
+  if(change)
+  	cameraC = camera;
+  else
+  	cameraC = camera2;
+	renderer.clear(true);
+  renderer.render(scene, cameraC);
+  renderer.render(sceneHUD, cameraHUD);
+}
+
+
+
+</script>
+</body>
+
+</html>
