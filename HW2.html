@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<div id="info">HW2
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://jyunming-chen.github.io/tutsplus/js/KeyboardState.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src='https://jyunming-chen.github.io/WebAudio/js/shared.js'></script>
+
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<script>
+var camera, scene, renderer, light;
+var recMesh, recMesh2, R
+var planes =[]
+var balls = []
+var collisionSound, collisionSound2
+var rPlanes = []
+
+var tempo = 120
+var sample = new RhythmSample();
+var score1 = [
+    {time: 0, instrument: 'c',}]
+
+class Box2{
+	constructor(){
+  	this.max = new THREE.Vector3()
+    this.min = new THREE.Vector3()
+  }
+}
+
+class Ball {
+	constructor (mesh, rad = 2) {
+  
+  	this.pos = new THREE.Vector3()
+    this.vel = new THREE.Vector3()
+    this.force = new THREE.Vector3()
+    this.mesh = mesh;
+    this.radius = rad;
+    var h = Math.floor((Math.random() * 360)) / 360
+    var color = new THREE.Color()
+    color.setHSL(h, 1, 0.5)
+    this.light = new THREE.PointLight (color, 1, 50);
+    scene.add (this.light)
+    scene.add (this.mesh)   // add to scene when particle is created
+
+		this.mesh.material.color.copy ( color.clone() );
+  }
+  update (dt) {
+		this.vel.add (this.force.clone().multiplyScalar (dt))
+  	this.pos.add (this.vel.clone().multiplyScalar(dt))
+    
+		this.collidingPlanes (planes)
+		this.mesh.position.copy (this.pos)
+    this.light.position.copy (this.pos)
+    this.light.position.z += 20
+  }
+  
+  collision_puck(puck2){
+        if(this.pos.distanceTo(puck2.pos) <= this.radius * 2){
+          var tmp = this.vel.clone();
+          var tmp2 = this.pos.clone().sub(puck2.pos);
+          var tmp3 = this.vel.clone().sub(puck2.vel);
+          tmp2.multiplyScalar(tmp3.dot(tmp2) / tmp2.lengthSq());
+          this.vel.sub(tmp2);
+          puck2.vel.sub(tmp2.negate());
+
+          var delta = puck2.pos.clone().sub(this.pos);
+          var d = puck2.pos.distanceTo(this.pos);
+          var diff = (d - this.radius * 2) / d;
+          tmp2 = delta.multiplyScalar(diff / 2);
+          this.pos.add(tmp2);
+          puck2.pos.sub(tmp2);
+          
+          sample.playSequence(score1);
+        }
+	}
+
+	collidingPlanes (planes) {
+    const EPS = 1e-3
+    const CR = 0.96
+  	for (let i = 0; i < planes.length; i++) {
+			let plane = planes[i]
+			let point = this.pos.clone().sub (plane.ptOnPl)
+      if ( point.dot(plane.normal) < EPS + this.radius) {
+				// position correction
+      	this.pos.copy (plane.ptOnPl.clone().add (point.projectOnPlane(plane.normal)) )
+        this.pos.add (plane.normal.clone().multiplyScalar(this.radius))
+      	// velocity update
+      	this.vel.sub (plane.normal.clone().multiplyScalar ((1+CR)*this.vel.dot(plane.normal)))
+      	//return;  // assume particle collides with AT MOST one plane
+        sample.playSequence(score1);
+      }
+  	}
+  }
+
+}
+
+class Plane {
+	constructor (localPointOnPlane, localNormal, mesh) {
+    this.localPtOnPl = localPointOnPlane.clone();
+		this.localNormal = localNormal.clone();
+    this.mesh = mesh;  // the graphics representation
+    scene.add (mesh)
+  }
+  update () {
+  	this.mesh.updateMatrixWorld() // important!
+  	this.ptOnPl = this.mesh.localToWorld (this.localPtOnPl.clone());
+    let normalMat = new THREE.Matrix3().getNormalMatrix (this.mesh.matrixWorld);  
+    this.normal = this.localNormal.clone().applyMatrix3 (normalMat).normalize()
+  }
+}
+
+function check_Intersection(r, c, rad){
+	
+	var rad2 = rad * rad
+  r.max.x -= c.x
+  r.max.y -= c.y
+  r.min.x -= c.x
+  r.min.y -= c.y
+  if(r.max.x < 0)
+  {
+    if(r.max.y < 0)
+    { //left down  1
+    	if(((r.max.x * r.max.x + r.max.y * r.max.y) < rad2))
+      	return 1
+      return 0
+      //return ((r.max.x * r.max.x + r.max.y * r.max.y) < rad2)
+    }
+    else if(r.min.y > 0)
+    { //left up  2
+    	if(((r.max.x * r.max.x + r.min.y * r.min.y) < rad2))
+      	return 2
+      return 0
+    	//return ((r.max.x * r.max.x + r.min.y * r.min.y) < rad2)
+    }
+    else{  //left  3
+    	if((Math.abs(r.max.x) < rad))
+      	return 3
+      return 0
+    	//return (Math.abs(r.max.x) < rad)
+    }
+  }
+  
+  else if(r.min.x > 0){
+  	if(r.max.y < 0){ //right down  4
+    	if(((r.min.x * r.min.x + r.max.y * r.max.y) < rad2))
+      	return 4
+      return 0
+    	//return ((r.min.x * r.min.x + r.max.y * r.max.y) < rad2)
+  	}
+    else if(r.min.y > 0){ //right up  5
+    	if(((r.min.x * r.min.x + r.min.y * r.min.y) < rad2))
+      	return 5
+      return 0
+  		//return ((r.min.x * r.min.x + r.min.y * r.min.y) < rad2)
+    }
+    else{  //right  6
+    	if((r.min.x < rad))
+      	return 6
+      return 0
+    	//return (r.min.x < rad)
+    }
+  }
+  else{
+  	if(r.max.y < 0){ //center down  7
+    	if((Math.abs(r.max.y) < rad))
+      	return 7
+      return 0
+      //return (Math.abs(r.max.y) < rad)
+    }
+  	else if(r.min.y > 0){ //center up  8
+    	if((r.min.y < rad))
+      	return 8
+      return 0
+      //return (r.min.y < rad)
+    }
+  	else  //center
+    	return 9
+  		//return true
+  }
+  
+}
+
+function coordinateOrigin(recMesh, r, c, rad, i){
+	r.max.x = 30 / 2
+  r.max.y = 120 / 2
+  r.min.x = r.max.x * -1
+  r.min.y = r.max.y * -1
+  var center = recMesh.position.clone()
+  var normalMat = new THREE.Matrix3().getNormalMatrix(recMesh.matrixWorld);
+  var xR = new THREE.Vector3(1, 0, 0)
+  xR.applyMatrix3(normalMat).normalize()
+  var yR = new THREE.Vector3(0, 1, 0)
+  yR.applyMatrix3(normalMat).normalize()
+  var cSubr = c.clone().sub(center)
+  var tmpC = new THREE.Vector3()
+  tmpC.x = cSubr.clone().dot(xR)
+  tmpC.y = cSubr.clone().dot(yR)
+  
+  var p1 = new THREE.Vector2(r.max.x, r.max.y).add(recMesh.position)
+  var p2 = new THREE.Vector2(r.min.x, r.max.y).add(recMesh.position)
+  var p3 = new THREE.Vector2(r.min.x, r.min.y).add(recMesh.position)
+  var p4 = new THREE.Vector2(r.max.x, r.min.y).add(recMesh.position)
+  p1.rotateAround(recMesh.position, recMesh.rotation.z)
+  p2.rotateAround(recMesh.position, recMesh.rotation.z)
+  p3.rotateAround(recMesh.position, recMesh.rotation.z)
+  p4.rotateAround(recMesh.position, recMesh.rotation.z)
+  var tmp, n = new THREE.Vector3(), p = new THREE.Vector3()//, plane
+  var res = check_Intersection(r, tmpC, rad)
+  if(res == 1){
+  	tmp = p1.clone().sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p1.x, p1.y, 0)
+  }
+  else if(res == 2){
+  	tmp = p4.clone().sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p4.x, p4.y, 0)
+  }
+  else if(res == 3){
+    tmp = p1.clone().add(p4).divideScalar(2).sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p1.x, p1.y, 0)
+  }
+  else if(res == 4){
+    tmp = p2.clone().sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p2.x, p2.y, 0)
+  }
+  else if(res == 5){
+    tmp = p3.clone().sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p3.x, p3.y, 0)
+  }
+  else if(res == 6){
+    tmp = p2.clone().add(p3).divideScalar(2).sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p2.x, p2.y, 0)
+  }
+  else if(res == 7){
+    tmp = p1.clone().add(p2).divideScalar(2).sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p1.x, p1.y, 0)
+  }
+  else if(res == 8){
+    tmp = p3.clone().add(p4).divideScalar(2).sub(recMesh.position).normalize()
+    n.set(tmp.x, tmp.y, 0)
+    p.set(p3.x, p3.y, 0)
+  }
+  if(res != 0){
+  	const EPS = 1e-3
+    const CR = 0.96
+    
+    let point = balls[i].pos.clone().sub (p)
+    if ( point.dot(n) < EPS + balls[i].radius) {
+      // position correction
+      balls[i].pos.copy (p.clone().add (point.projectOnPlane(n)) )
+      balls[i].pos.add (n.clone().multiplyScalar(balls[i].radius))
+      // velocity update
+      balls[i].vel.sub (n.clone().multiplyScalar ((1+CR)*balls[i].vel.dot(n)))
+      //return;  // assume particle collides with AT MOST one plane
+      sample.playSequence(score1);
+    }
+  }
+  
+	return res
+}
+
+///////////////////////////////////////////////////////////////////////
+
+init();
+animate();
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.y = -250
+  camera.position.z = 100;
+
+  light = new THREE.AmbientLight(0x444444);
+  //light.position.set(100, 300, 200);
+  scene.add(light);
+
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  gridXZ.rotation.x = -Math.PI/2
+  //scene.add(gridXZ);
+  var floor = new THREE.Mesh (new THREE.PlaneGeometry (200,200), new THREE.MeshPhongMaterial({color:0xffffff}))
+ // floor.rotation.x = -Math.PI/2
+  scene.add (floor)
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  document.body.appendChild(renderer.domElement);
+  ///////////////////////////////////////////////////////////
+  var disk, ball
+  disk = new THREE.Mesh (new THREE.CylinderGeometry (10, 10, 6, 32), new THREE.MeshLambertMaterial() )
+  disk.rotation.x = Math.PI / 2
+	ball = new Ball (disk.clone(), 10)
+  ball.vel.set (-60,-60,0)
+  ball.pos.set (40,-50,3)
+	balls.push (ball)
+  
+  disk = new THREE.Mesh (new THREE.CylinderGeometry (10, 10, 6, 32), new THREE.MeshLambertMaterial() )
+  disk.rotation.x = Math.PI / 2
+	ball = new Ball (disk.clone(), 10)
+  ball.vel.set (0,-30,0)
+  ball.pos.set (-60,0,3)
+	balls.push (ball)
+  
+  disk = new THREE.Mesh (new THREE.CylinderGeometry (10, 10, 6, 32), new THREE.MeshLambertMaterial() )
+  disk.rotation.x = Math.PI / 2
+	ball = new Ball (disk.clone(), 10)
+  ball.vel.set (50,-30,0)
+  ball.pos.set (60,15,3)
+	balls.push (ball)
+  
+  disk = new THREE.Mesh (new THREE.CylinderGeometry (10, 10, 6, 32), new THREE.MeshLambertMaterial() )
+  disk.rotation.x = Math.PI / 2
+	ball = new Ball (disk.clone(), 10)
+  ball.vel.set (40,-30,0)
+  ball.pos.set (60,30,3)
+	balls.push (ball)
+  
+  disk = new THREE.Mesh (new THREE.CylinderGeometry (10, 10, 6, 32), new THREE.MeshLambertMaterial() )
+  disk.rotation.x = Math.PI / 2
+	ball = new Ball (disk.clone(), 10)
+  ball.vel.set (30,-30,0)
+  ball.pos.set (-60,45,3)
+	balls.push (ball)
+
+	let plane, wall
+  wall = new THREE.Mesh ( new THREE.BoxGeometry (220, 10, 10), new THREE.MeshPhongMaterial() )
+  scene.add (wall)
+  wall.position.y = 105
+	plane = new Plane (new THREE.Vector3(0,-5,0), new THREE.Vector3(0,-1,0), wall)
+  plane.update()
+  planes.push (plane)
+
+  wall = new THREE.Mesh ( new THREE.BoxGeometry (220, 10, 10), new THREE.MeshPhongMaterial() )
+  scene.add (wall)
+  wall.position.y = -105
+	plane = new Plane (new THREE.Vector3(0,5,0), new THREE.Vector3(0,1,0), wall.clone())
+  plane.update()
+  planes.push (plane)
+  
+  wall = new THREE.Mesh ( new THREE.BoxGeometry (10, 220, 10), new THREE.MeshPhongMaterial() )
+  scene.add (wall)
+  wall.position.x = 105
+	plane = new Plane (new THREE.Vector3(-5,0,0), new THREE.Vector3(-1,0,0), wall.clone())
+  plane.update()
+  planes.push (plane)
+  
+  wall = new THREE.Mesh ( new THREE.BoxGeometry (10, 220, 10), new THREE.MeshPhongMaterial() )
+  scene.add (wall)
+  wall.position.x = -105
+	plane = new Plane (new THREE.Vector3(5,0,0), new THREE.Vector3(1,0,0), wall.clone())
+  plane.update()
+  planes.push (plane)
+  
+  //finite plane
+  R = new Box2()
+  recMesh = new THREE.Mesh(new THREE.BoxGeometry(30, 120, 6), new THREE.MeshPhongMaterial({color: 0x00ff00}))
+  recMesh.position.z = 3
+  recMesh.updateMatrixWorld()
+  recMesh2 = new THREE.Mesh(new THREE.BoxGeometry(30, 120, 6), new THREE.MeshPhongMaterial({color: 0x00ff00}))
+  recMesh2.position.z = 3
+  recMesh2.rotation.z = Math.PI / 2
+  recMesh2.updateMatrixWorld()
+  scene.add(recMesh, recMesh2)
+  
+  //sound
+  RhythmSample.prototype.playSequence = function (score) {
+    var startTime = context.currentTime;  // in seconds, from webaudio
+    var eighthNoteTime = 60/tempo/2;
+
+    for (var ii = 0; ii < score.length; ii++) {
+        if (score[ii].instrument == 'c') 
+            playSound2(this.collision, startTime + score[ii].time * eighthNoteTime, score[ii].intensity);
+    }
+
+}
+
+}
+
+function playSound2(buffer, time, intensity) {
+    var gainNode = context.createGain();
+    var source = context.createBufferSource();
+    source.buffer = buffer;
+
+    // Connect source to a gain node
+    source.connect(gainNode);
+    // Connect gain node to destination
+    gainNode.connect(context.destination);
+
+    var gainval = intensity || 0.5;
+    gainNode.gain.value = gainval;
+
+    source[source.start ? 'start' : 'noteOn'](time);
+    
+}
+function RhythmSample() {
+    loadSounds(this, {
+        collision: 'https://jyunming-chen.github.io/gameHWhelpers/sounds/collision3.wav'
+    });
+}
+
+function animate() {
+
+	balls.forEach (function(b) {b.update(0.1)})
+  var i, j
+  if(balls.length > 1){
+	  for(i = 0; i < balls.length - 1; i++)
+    	for(j = i + 1; j < balls.length; j++)
+    		balls[i].collision_puck(balls[j]);
+  }
+  recMesh.rotation.z += 0.01
+  recMesh2.rotation.z += 0.01
+  for(let i = 0; i < balls.length; i++){
+  	coordinateOrigin(recMesh, R, balls[i].mesh.position, 10, i)
+    coordinateOrigin(recMesh2, R, balls[i].mesh.position, 10, i)
+  }
+  
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+
+
+</script>
+</body>
+
+</html>
