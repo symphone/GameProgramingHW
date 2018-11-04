@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+
+
+</style>
+</head>
+
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/84/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<audio id="soundtrack" loop style="display:none">
+<source src="music/Challenge Fairy Tail.mp3" type='audio/mp3'>
+</audio> 
+<script>
+var scene, renderer, camera;
+var dancer;
+
+var gcontrols = {upperALX: 0.1, upperALY: 0.1, upperALZ: 0.1, lowerALX: 0.1, lowerALY: 0.1, lowerALZ: 0.01, upperARX: 0.1, upperARY: 0.1, upperARZ: 0.1, lowerARX: 0.1, lowerARY: 0.1, lowerARZ: 0.01, legLX: 0.1, legLY: 0.1, legLZ: 0.1, legRX: 0.1, legRY: 0.1, legRZ: 0.1, bodyPosX: 0.1, bodyPosY: 135, bodyPosZ: 0.1, bodyRotX: 0.1, bodyRotY: 0.1, bodyRotZ: 0.1};
+var pose1 = {upperALX: 0, upperALY: 0, upperALZ: 0, lowerALX: 0, lowerALY: 0, lowerALZ: 0, upperARX: 0, upperARY: 0, upperARZ: 0, lowerARX: 0, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 135, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 0, bodyRotZ: 0};
+var pose2 = {upperALX: 2.66, upperALY: 0, upperALZ: 0, lowerALX: 0, lowerALY: 0, lowerALZ: 0, upperARX: 2.66, upperARY: 0, upperARZ: 0, lowerARX: 0, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 155, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 0, bodyRotZ: 0};
+var pose3 = {upperALX: 0, upperALY: 0, upperALZ: 2.63, lowerALX: 0, lowerALY: 0, lowerALZ: 0, upperARX: 0, upperARY: 0, upperARZ: -2.54, lowerARX: 0, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 135, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 0, bodyRotZ: 0};
+var pose4 = {upperALX: 1.78, upperALY: 0.92, upperALZ: -0.04, lowerALX: 1.6, lowerALY: 0, lowerALZ: 0, upperARX: 0.54, upperARY: -1.41, upperARZ: -1.41, lowerARX: 1.55, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0.4, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 135, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 0, bodyRotZ: 0.1};
+var pose5 = {upperALX: 0, upperALY: 0, upperALZ: 0.8, lowerALX: 1.3, lowerALY: 0, lowerALZ: 0, upperARX: -1.08, upperARY: 0, upperARZ: 0, lowerARX: 1, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 135, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 3.05, bodyRotZ: 0};
+var pose6 = {upperALX: 0, upperALY: 0, upperALZ: 0.8, lowerALX: 1.3, lowerALY: 0, lowerALZ: 0, upperARX: -1.08, upperARY: 0, upperARZ: 0, lowerARX: 1, lowerARY: 0, lowerARZ: 0, legLX: 0, legLY: 0, legLZ: 0, legRX: 0, legRY: 0, legRZ: 0, bodyPosX: 0, bodyPosY: 135, bodyPosZ: 0, bodyRotX: 0, bodyRotY: 0, bodyRotZ: 0};
+
+var keys = [
+  [0, pose1],
+  [0.1, pose2],
+  [0.2, pose1],
+  [0.25, pose3],
+  [0.4, pose1],
+  [0.5, pose3],
+  [0.7, pose4],
+  [0.8, pose6],
+  [0.9, pose5],
+  [1, pose1]
+];
+var T = 8.5;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime()
+var intKey =[];
+
+//////////////////////////////////////////////////
+init();
+animate();
+function buildDancer(){
+  var body = new THREE.Mesh(new THREE.BoxGeometry(40, 90, 20))
+  var head = new THREE.Mesh(new THREE.CylinderGeometry(10, 10, 30, 32))
+  var armLeft = new THREE.Object3D()
+  var upperArmLeft = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 45, 32))
+  var elbowLeft = new THREE.Object3D()
+  var lowerArmLeft = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 45, 32))
+  var armRight = new THREE.Object3D()
+  var upperArmRight = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 45, 32))
+  var elbowRight = new THREE.Object3D()
+  var lowerArmRight = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 45, 32))
+  var legL = new THREE.Object3D()
+  var legLeft = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 90, 32))
+  var legR = new THREE.Object3D()
+  var legRight = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 90, 32))
+  //head 0, ual 1, uar 2, ll 3, lr 4 
+  body.add(head)
+  body.add(armLeft)
+  armLeft.add(upperArmLeft)
+  upperArmLeft.add(elbowLeft)
+  elbowLeft.add(lowerArmLeft)
+  body.add(armRight)
+  armRight.add(upperArmRight)
+  upperArmRight.add(elbowRight)
+  elbowRight.add(lowerArmRight)
+  body.add(legL)
+  legL.add(legLeft)
+  body.add(legR)
+  legR.add(legRight)
+  
+  head.position.set(0, 60, 0)
+  armLeft.position.set(25, 45, 0)
+  upperArmLeft.position.set(0, -22.5, 0)
+  elbowLeft.position.set(0, -22.5, 0)
+  lowerArmLeft.position.set(0, -22.5, 0)
+  armRight.position.set(-25, 45, 0)
+  upperArmRight.position.set(0, -22.5, 0)
+  elbowRight.position.set(0, -22.5, 0)
+  lowerArmRight.position.set(0, -22.5, 0)
+  legL.position.set(10, -45, 0)
+  legLeft.position.set(0, -45, 0)
+  legR.position.set(-10, -45, 0)
+  legRight.position.set(0, -45, 0)
+  body.position.set(0, 135, 0)
+  return body
+}
+
+function init() {
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.y = 300;
+  camera.position.z = -600;
+  camera.lookAt(new THREE.Vector3(0, 0, 0));
+  document.body.appendChild(renderer.domElement);
+  
+  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  scene.add(gridXZ);
+  window.addEventListener('resize', onWindowResize, false);
+
+  //////////////////////////////////////////////////
+  dancer = buildDancer()
+  scene.add(dancer)
+  
+  ///////////////////////
+   /*var gui = new dat.GUI( {load: loadJSON()}  );
+   gui.remember (gcontrols)
+   var f1 = gui.addFolder("upperAL");
+   f1.add(gcontrols, 'upperALX', -3.2, 3.2);
+   f1.add(gcontrols, 'upperALY', -4.8, 1.6);
+   f1.add(gcontrols, 'upperALZ', -1.6, 4.8);
+   var f2 = gui.addFolder("lowerAL");
+   f2.add(gcontrols, 'lowerALX', 0, 1.6);
+   f2.add(gcontrols, 'lowerALY', 0, 1.6);
+   f2.add(gcontrols, 'lowerALZ', 0, 0.01);
+   var f3 = gui.addFolder("upperAR");
+   f3.add(gcontrols, 'upperARX', -3.2, 3.2);
+   f3.add(gcontrols, 'upperARY', -4.8, 1.6);
+   f3.add(gcontrols, 'upperARZ', -4.8, 1.6);
+   var f4 = gui.addFolder("lowerAR");
+   f4.add(gcontrols, 'lowerARX', 0, 1.6);
+   f4.add(gcontrols, 'lowerARY', 0, 1.6);
+   f4.add(gcontrols, 'lowerARZ', 0, 0.01);
+   var f5 = gui.addFolder("legL");
+   f5.add(gcontrols, 'legLX', 0, 1.6);
+   f5.add(gcontrols, 'legLY', 0, 1.6);
+   f5.add(gcontrols, 'legLZ', 0, 0.5);
+   var f6 = gui.addFolder("legR");
+   f6.add(gcontrols, 'legRX', 0, 0.8);
+   f6.add(gcontrols, 'legRY', 0, 0.8);
+   f6.add(gcontrols, 'legRZ', -0.5, 0.1);
+   var f7 = gui.addFolder("bodyPos");
+   f7.add(gcontrols, 'bodyPosX', -20, 20);
+   f7.add(gcontrols, 'bodyPosY', 135, 155);
+   f7.add(gcontrols, 'bodyPosZ', -20, 20);
+   var f8 = gui.addFolder("bodyRot");
+   f8.add(gcontrols, 'bodyRotX', -6.4, 6.4);
+   f8.add(gcontrols, 'bodyRotY', -6.4, 6.4);
+   f8.add(gcontrols, 'bodyRotZ', -6.4, 6.4);*/
+   soundTrack = document.getElementById('soundtrack')
+}
+
+
+function onWindowResize() {
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width, height);
+}
+
+function loadJSON(){
+  return {
+  "preset": "pose6",
+  "remembered": {
+    "Default": {
+      "0": {
+        "theta1": 0.1,
+        "theta2": 0.1
+      }
+    },
+    "pose1": {
+      "0": {
+        "upperALX": 0,
+        "upperALY": 0,
+        "upperALZ": 0,
+        "lowerALX": 0,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": 0,
+        "upperARY": 0,
+        "upperARZ": 0,
+        "lowerARX": 0,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 135,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 0,
+        "bodyRotZ": 0
+      }
+    },
+    "pose2": {
+      "0": {
+        "upperALX": 2.6581494114831647,
+        "upperALY": 0,
+        "upperALZ": 0,
+        "lowerALX": 0,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": 2.66,
+        "upperARY": 0,
+        "upperARZ": 0,
+        "lowerARX": 0,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 155,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 0,
+        "bodyRotZ": 0
+      }
+    },
+    "pose3": {
+      "0": {
+        "upperALX": 0,
+        "upperALY": 0,
+        "upperALZ": 2.6348068034818053,
+        "lowerALX": 0,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": 0,
+        "upperARY": 0,
+        "upperARZ": -2.54143637147637,
+        "lowerARX": 0,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 135,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 0,
+        "bodyRotZ": 0
+      }
+    },
+    "pose4": {
+      "0": {
+        "upperALX": 1.1759670302645322,
+        "upperALY": 0.9169891847004381,
+        "upperALZ": -0.04723750539000471,
+        "lowerALX": 1.6,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": 0.5407460097422616,
+        "upperARY": -1.4121545572145555,
+        "upperARZ": -1.4121545572145555,
+        "lowerARX": 1.5527624946099954,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0.3970131378264193,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 135,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 0,
+        "bodyRotZ": 0.09337043200543427
+      }
+    },
+    "pose5": {
+      "0": {
+        "upperALX": 0,
+        "upperALY": 0,
+        "upperALZ": 0.7997238553063566,
+        "lowerALX": 1.3057320977402234,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": -1.0825965982590975,
+        "upperARY": 0,
+        "upperARZ": 0,
+        "lowerARX": 1.005766615826929,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 155,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 3.0577351944426994,
+        "bodyRotZ": 0
+      }
+    },
+    "pose6": {
+      "0": {
+        "upperALX": 0,
+        "upperALY": 0,
+        "upperALZ": 0.7997238553063566,
+        "lowerALX": 1.3057320977402234,
+        "lowerALY": 0,
+        "lowerALZ": 0,
+        "upperARX": -1.0825965982590975,
+        "upperARY": 0,
+        "upperARZ": 0,
+        "lowerARX": 1.005766615826929,
+        "lowerARY": 0,
+        "lowerARZ": 0,
+        "legLX": 0,
+        "legLY": 0,
+        "legLZ": 0,
+        "legRX": 0,
+        "legRY": 0,
+        "legRZ": 0,
+        "bodyPosX": 0,
+        "bodyPosY": 155,
+        "bodyPosZ": 0,
+        "bodyRotX": 0,
+        "bodyRotY": 0,
+        "bodyRotZ": 0
+      }
+    }
+  },
+  "closed": false,
+  "folders": {
+    "upperAL": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "lowerAL": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "upperAR": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "lowerAR": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "legL": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "legR": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "bodyPos": {
+      "preset": "Default",
+      "closed": true,
+      "folders": {}
+    },
+    "bodyRot": {
+      "preset": "Default",
+      "closed": false,
+      "folders": {}
+    }
+  }
+}
+}
+
+
+function keyframe(t) {
+  var s = ((t - ts) % T) / T;
+
+  for (var i = 1; i < keys.length; i++) {
+    if (keys[i][0] > s) break;
+  }
+    
+  // take i-1
+  var ii = i - 1;
+  var a = (s - keys[ii][0]) / (keys[ii + 1][0] - keys[ii][0]);
+  intKey = [keys[ii][1].upperALX * (1 - a) + keys[ii + 1][1].upperALX * a,
+    keys[ii][1].upperALY * (1 - a) + keys[ii + 1][1].upperALY * a,
+    keys[ii][1].upperALZ * (1 - a) + keys[ii + 1][1].upperALZ * a,
+    keys[ii][1].lowerALX * (1 - a) + keys[ii + 1][1].lowerALX * a,
+    keys[ii][1].lowerALY * (1 - a) + keys[ii + 1][1].lowerALY * a,
+    keys[ii][1].lowerALZ * (1 - a) + keys[ii + 1][1].lowerALZ * a,
+    keys[ii][1].upperARX * (1 - a) + keys[ii + 1][1].upperARX * a,
+    keys[ii][1].upperARY * (1 - a) + keys[ii + 1][1].upperARY * a,
+    keys[ii][1].upperARZ * (1 - a) + keys[ii + 1][1].upperARZ * a,
+    keys[ii][1].lowerARX * (1 - a) + keys[ii + 1][1].lowerARX * a,
+    keys[ii][1].lowerARY * (1 - a) + keys[ii + 1][1].lowerARY * a,
+    keys[ii][1].lowerARZ * (1 - a) + keys[ii + 1][1].lowerARZ * a,
+    keys[ii][1].legLX * (1 - a) + keys[ii + 1][1].legLX * a,
+    keys[ii][1].legLY * (1 - a) + keys[ii + 1][1].legLY * a,
+    keys[ii][1].legLZ * (1 - a) + keys[ii + 1][1].legLZ * a,
+    keys[ii][1].legRX * (1 - a) + keys[ii + 1][1].legRX * a,
+    keys[ii][1].legRY * (1 - a) + keys[ii + 1][1].legRY * a,
+    keys[ii][1].legRZ * (1 - a) + keys[ii + 1][1].legRZ * a,
+    keys[ii][1].bodyPosX * (1 - a) + keys[ii + 1][1].bodyPosX * a,
+    keys[ii][1].bodyPosY * (1 - a) + keys[ii + 1][1].bodyPosY * a,
+    keys[ii][1].bodyPosZ * (1 - a) + keys[ii + 1][1].bodyPosZ * a,
+    keys[ii][1].bodyRotX * (1 - a) + keys[ii + 1][1].bodyRotX * a,
+    keys[ii][1].bodyRotY * (1 - a) + keys[ii + 1][1].bodyRotY * a,
+    keys[ii][1].bodyRotZ * (1 - a) + keys[ii + 1][1].bodyRotZ * a
+  ];
+
+}
+
+function dancerMove(){
+	dancer.children[1].rotation.x = intKey[0] //gcontrols.upperALX
+  dancer.children[1].rotation.y = intKey[1] //gcontrols.upperALY
+  dancer.children[1].rotation.z = intKey[2] //gcontrols.upperALZ
+  dancer.children[1].children[0].children[0].rotation.x = intKey[3] //gcontrols.lowerALX
+  dancer.children[1].children[0].children[0].rotation.y = intKey[4] //gcontrols.lowerALY
+  dancer.children[1].children[0].children[0].rotation.z = intKey[5] //gcontrols.lowerALZ
+  
+  dancer.children[2].rotation.x = intKey[6] //gcontrols.upperARX
+  dancer.children[2].rotation.y = intKey[7] //gcontrols.upperARY
+  dancer.children[2].rotation.z = intKey[8] //gcontrols.upperARZ
+  dancer.children[2].children[0].children[0].rotation.x = intKey[9] //gcontrols.lowerARX
+  dancer.children[2].children[0].children[0].rotation.y = intKey[10] //gcontrols.lowerARY
+  dancer.children[2].children[0].children[0].rotation.z = intKey[11] //gcontrols.lowerARZ
+  
+  dancer.children[3].rotation.x = intKey[12] //gcontrols.legLX
+  dancer.children[3].rotation.y = intKey[13] //gcontrols.legLY
+  dancer.children[3].rotation.z = intKey[14] //gcontrols.legLZ
+  
+  dancer.children[4].rotation.x = intKey[15] //gcontrols.legRX
+  dancer.children[4].rotation.y = intKey[16] //gcontrols.legRY
+  dancer.children[4].rotation.z = intKey[17] //gcontrols.legRZ
+  
+  dancer.position.x = intKey[18] //gcontrols.bodyPosX
+  dancer.position.y = intKey[19] //gcontrols.bodyPosY
+  dancer.position.z = intKey[20] //gcontrols.bodyPosZ
+  
+  dancer.rotation.x = intKey[21] //gcontrols.bodyRotX
+  dancer.rotation.y = intKey[22] //gcontrols.bodyRotY
+  dancer.rotation.z = intKey[23] //gcontrols.bodyRotZ
+  soundTrack.play()
+}
+
+function animate() {
+  keyframe (clock.getElapsedTime())
+  dancerMove()
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+	
+
+  renderer.render(scene, camera);
+}
+
+
+</script>
+</body>
+
+</html>
