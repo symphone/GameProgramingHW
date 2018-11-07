@@ -14,6 +14,7 @@
 <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5/dat.gui.min.js"></script>
 <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/Gyroscope.js"></script>
 
 <audio id="soundtrack" loop style="display:none">
 <source src="music/Challenge Fairy Tail.mp3" type='audio/mp3'>
@@ -122,6 +123,10 @@ function init() {
   dancer = buildDancer()
   scene.add(dancer)
   
+  var gyro = new THREE.Gyroscope();
+  scene.add (gyro)
+  gyro.add (camera)
+  dancer.add (gyro)
   ///////////////////////
    /*var gui = new dat.GUI( {load: loadJSON()}  );
    gui.remember (gcontrols)
