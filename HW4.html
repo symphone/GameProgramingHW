@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<div id="info">walking/gyro/shadow/up/down
+<br>
+  <button id="UP" style="width:20%">GO UP</button>
+<br>
+  <button id="DOWN" style="width:20%">GO DOWN</button>
+<br>
+  <button id="walk" style="width:20%">walk</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/94/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js">
+</script>
+<script src="https://jyunming-chen.github.io/game3js/js/ccdsys.js"></script>
+<script src="https://rawgit.com/mrdoob/three.js/dev/examples/js/Gyroscope.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+</style>
+</head>
+
+<body> 
+<script>
+var biped = {
+	thetaGroin: 0.31,
+  thetaKnee: 0.6, 
+  //target: new THREE.Vector3(),
+  
+  init: function() {
+		let body = new THREE.Object3D();
+		let mat = new THREE.MeshPhongMaterial({color: 0x00ff00});
+  
+  	this.thigh = new THREE.Object3D();
+  	let thighMesh = new THREE.Mesh (new THREE.BoxGeometry(1, L2, 1, 32, 32, 32), mat)
+  	this.thigh.add (thighMesh)
+  	thighMesh.position.y = -L2/2
+  
+  	this.leg = new THREE.Object3D()
+  	let legMesh = new THREE.Mesh (new THREE.BoxGeometry(1, L1, 1, 32, 32, 32), mat)
+  	this.leg.add (legMesh)
+  	legMesh.position.y = -L1/2
+  	this.leg.position.y = -L2
+  
+  	this.torso = new THREE.Object3D();
+  	let torsoMesh = new THREE.Mesh (new THREE.BoxGeometry(1, Lh, 1, 32, 32, 32), mat)
+  	this.torso.add (torsoMesh)
+  	torsoMesh.position.y = Lh/2
+    
+    thighMesh.castShadow = true
+    thighMesh.receiveShadow = true
+    legMesh.castShadow = true
+    legMesh.receiveShadow = true
+    torsoMesh.castShadow = true
+    torsoMesh.receiveShadow = true
+  
+  	body.add (this.torso)
+  	body.add (this.thigh)
+  	this.thigh.add (this.leg)
+  	return body;
+	},
+  
+  update: function (theta) {
+  //console.log (theta)
+  	this.thetaGroin = theta[0]
+    this.thetaKnee = theta[1]
+  
+    this.thigh.rotation.z = this.thetaGroin
+    this.leg.rotation.z = this.thetaKnee;  
+  },
+  
+  fk: function (theta, joints) {
+    joints[0].set (0,0,0);
+
+    var localzero = new THREE.Vector3(0, 0, 0);
+    var m = new THREE.Matrix4();
+    m.makeRotationZ(theta[0]);
+    m.multiply(new THREE.Matrix4().makeTranslation(0, -L2, 0));
+    localzero.applyMatrix4(m);
+    joints[1].copy(localzero);
+
+    localzero.set(0, 0, 0);
+    m.multiply(new THREE.Matrix4().makeRotationZ(theta[1]));
+    m.multiply(new THREE.Matrix4().makeTranslation(0, -L1, 0));
+    localzero.applyMatrix4(m);
+    joints[2].copy(localzero);
+  }
+
+
+}
+
+var camera, scene, renderer;
+const LS = 5.3
+const L2 = 5.2
+const L1 = 4.8
+const Lh = 3.3
+const Hh = 8.3
+const Fc = 1
+const HR = 0.6
+var body , left //= Object.assign({}, biped) //jQuery.extend({}, biped);
+var body2, tmpX = 0, tmpX2 = 0, tmpY = 0, tmpY2 = 0
+var gyro, light, angle = 0, high = 0
+
+var T = 2;
+var clock = new THREE.Clock();
+var ts = clock.getElapsedTime();
+
+init();
+animate();
+
+$("#UP").click(function() {
+  clock.start()
+  angle = Math.PI/6
+  high = 0
+});
+$("#DOWN").click(function() {
+  clock.start()
+  angle = -Math.PI/6
+  high = 30
+});
+$("#walk").click(function() {
+  clock.start()
+  angle = 0
+  high = 0
+});
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+  camera.position.z = 50;
+
+  var gridXZ = new THREE.GridHelper(200, 20, 'red', 'white');
+  //scene.add(gridXZ);
+
+  renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+
+  let controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+  document.body.appendChild(renderer.domElement);
+  ///////////////////////////////////////////////////////////
+	body = biped.init();
+  scene.add(body)
+  //body.position.y = Hh;
+  
+  biped.ccdSys = new CCDSys (biped.fk)
+  biped.ccdSys.setCCDAxis (new THREE.Vector3(0,0,1), 0, -Math.PI/2, Math.PI/2)
+  biped.ccdSys.setCCDAxis (new THREE.Vector3(0,0,1), 1, -Math.PI,-0.05)
+  body.position.set(0.1, Hh, 0)
+  
+  left = Object.assign({}, biped)
+  body2 = left.init();
+  scene.add(body2)
+  left.ccdSys = new CCDSys (left.fk)
+  left.ccdSys.setCCDAxis (new THREE.Vector3(0,0,1), 0, -Math.PI/2, Math.PI/2)
+  left.ccdSys.setCCDAxis (new THREE.Vector3(0,0,1), 1, -Math.PI,-0.05)
+  body2.position.set(0.1, Hh, -5)
+  biped.target = new THREE.Vector3()
+  left.target = new THREE.Vector3()
+  
+  
+  
+  gyro = new THREE.Gyroscope();
+  scene.add (gyro)
+  gyro.add (camera)
+  body.add (gyro)
+  
+  
+  //plane
+  var loader = new THREE.TextureLoader();
+  loader.setCrossOrigin('');
+  var texture = loader.load ( 'https://i.imgur.com/p8CRm9W.jpg' );
+  texture.wrapS = texture.wrapT = THREE.WrapRepeating;
+  texture.repeat.set(500, 500)
+  let plane = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), new THREE.MeshPhongMaterial({map: texture}))
+  scene.add(plane)
+  plane.rotation.x = -Math.PI/2
+  
+  //light
+  light = new THREE.SpotLight( 0xffffff )
+  light.position.set(0, 100, 50);
+  light.angle = Math.PI/3;
+  light.penumbra = 0.5
+	scene.add( light )
+  light.target = body
+  
+  gyro.add (light)
+  
+  //shadow
+  light.castShadow = true;
+  light.shadow.mapSize.width = 1024;
+  light.shadow.mapSize.height = 1024;
+  light.shadow.camera.near = 10;
+  light.shadow.camera.far = 200;
+  light.shadow.camera.fov = light.angle / Math.PI * 180 * 2;
+  //light.shadow.bias = -0.001
+	
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  
+  plane.receiveShadow = true;
+ }
+
+
+function legPos(t){
+	let posX //= 2 * LS * t / T
+  let posY //= Fc / -2 * Math.cos(2 * Math.PI * t / T)
+  let posXX = LS / 2 + LS * t / T
+  //let posXX = LS / 2 * (1 - t / T) + 3/2 * LS * (t / T)
+  let posYY = Hh - HR / 2 * Math.cos(2 * Math.PI * t / T)
+  let newT = Math.floor(t/T)
+  
+  if(newT < 1){
+    newT = Math.floor(newT/2)*T + t%T
+    posX = LS * newT / T
+  	posY = Fc/2 - Fc / 2 * Math.cos(2 * Math.PI * newT / T)
+    tmpX = posX+0.1
+    tmpX *= Math.cos(angle)
+    tmpY = posY + tmpX * Math.sin(angle) + high
+    
+    posXX = LS / 4 + LS * t / T
+  }
+  else if(newT % 2 === 0){
+  	newT = Math.floor(newT/2)*T + t%T
+    posX = 2 * LS * newT / T
+  	posY = Fc/2 - Fc / 2 * Math.cos(2 * Math.PI * newT / T)
+  	tmpX = posX-LS+0.1
+    tmpX *= Math.cos(angle)
+    tmpY = posY + tmpX * Math.sin(angle) + high
+    
+  }
+  else{
+    newT = Math.floor((newT-1)/2)*T + t%T
+    posX = 2 * LS * newT / T
+  	posY = Fc/2 - Fc / 2 * Math.cos(2 * Math.PI * newT / T)
+    tmpX2 = posX+0.1
+    tmpX2 *= Math.cos(angle)
+    tmpY2 = posY + tmpX2 * Math.sin(angle) + high
+  }
+  posXX = posXX-LS*3/4
+  posXX *= Math.cos(angle)
+  posYY += 1
+  posYY += posXX * Math.sin(angle) + high
+  biped.target.copy (body.worldToLocal (new THREE.Vector3(tmpX, tmpY, 0)))
+  left.target.copy (body2.worldToLocal (new THREE.Vector3(tmpX2, tmpY2, -5)))
+  body.position.set(posXX, posYY, 0)
+  body2.position.set(posXX, posYY, -5)
+}
+
+function animate() {
+  legPos(clock.getElapsedTime())
+  //legPos(0)
+  let thetas = [biped.thetaGroin,biped.thetaKnee]
+  //biped.target.copy (body.worldToLocal (new THREE.Vector3(-LS/2, 0, 0)))
+  biped.ccdSys.solve (biped.target, thetas)
+  
+  biped.update (thetas)
+  
+  let thetas2 = [left.thetaGroin,left.thetaKnee]
+  //left.target.copy (body2.worldToLocal (new THREE.Vector3(LS/2, 0, -5)))
+  left.ccdSys.solve (left.target, thetas2)
+  left.update (thetas2)
+  //body.position.set(0, Hh, 0)
+  //body2.position.set(0, Hh, -5)
+  
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+
+
+</script>
+</body>
+
+</html>
