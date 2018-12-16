@@ -1,0 +1,409 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>three.js webgl - morphtargets - MD2 controls</title>
+	<style>
+		body {
+			color: #000;
+			font-family:Monospace;
+			font-size:13px;
+			text-align:center;
+			font-weight: bold;
+
+			background-color: #fff;
+			margin: 0px;
+			overflow: hidden;
+		}
+
+		#info {
+			position: absolute;
+			padding: 10px;
+			width: 100%;
+			text-align: center;
+			color: #000;
+		}
+
+		a { color: skyblue; }
+	</style>
+</head>
+
+<body>
+	<div id="info">
+	<audio id="getTreasure" style="display:none">
+<source src="music/smw_coin.wav" type='audio/wav'>
+</audio>
+	</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/94/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script src='https://rawgit.com/mrdoob/three.js/dev/examples/js/loaders/MD2Loader.js'></script>
+<script src='https://rawgit.com/mrdoob/three.js/dev/examples/js/MorphBlendMesh.js'></script>
+<script src='https://rawgit.com/mrdoob/three.js/dev/examples/js/MD2CharacterComplex.js'></script>
+<script src='https://rawgit.com/mrdoob/three.js/dev/examples/js/Gyroscope.js'></script>
+<script>
+
+class MD2Wrapper {
+	constructor (config, controls, pos, scale = 1) {
+
+		this.md2 = new THREE.MD2CharacterComplex();
+		this.md2.scale = scale
+		this.md2.controls = controls
+		
+		this.md2.onLoadComplete = function () {
+			// here: 'this' is md2
+			
+			// cast and receive shadows
+			this.enableShadows( true );
+
+			this.setWeapon( 0 );
+			this.setSkin( 0 );
+
+			//this.root.position.copy (pos);
+			this.root.position.x = pos.x;
+			this.root.position.z = pos.z;
+			
+			// y is automatically set, accoording to scale ...				
+			console.log ('y is ' + this.root.position.y)
+			
+			scene.add( this.root );		
+		}
+		this.md2.loadParts( config );
+					
+	}
+}
+
+class Platform{
+	constructor(l, w, h, n, s, posX, posZ){
+    this.length  = l
+    this.width   = w
+    this.high     = h
+    this.num     = n
+    this.spacing = s
+    let loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('');
+    let tex = loader.load( "https://i.imgur.com/R6E4hPX.jpg" );
+    tex.wrapS = tex.wrapT = THREE.WrapRepeating;
+    tex.repeat.set(3, 3)
+    let mat = new THREE.MeshPhongMaterial({map: tex})
+  	this.floor = new THREE.Mesh(new THREE.BoxGeometry(this.length, this.high, this.width), mat)
+	this.floor.receiveShadow = true;
+    let stair
+    for(let i = 1; i <= this.num; i++){
+    	stair = new THREE.Mesh(new THREE.BoxGeometry(this.length - i * this.spacing, this.high, this.width - i * this.spacing), mat)
+	stair.receiveShadow = true;
+      this.floor.add(stair)
+      stair.position.y = this.high * i
+    }
+    this.floor.position.y = this.high / 2
+    this.floor.position.x = posX
+    this.floor.position.z = posZ
+    //return this.floor
+  }
+}
+
+class Treasure{
+    constructor(x, z){
+        this.x = x
+        this.z = z
+        this.body = new THREE.Mesh(new THREE.CylinderGeometry(50, 50, 10, 32), new THREE.MeshBasicMaterial({color: 0xffff00}))
+        let h = height(this.x, this.z, platforms) + 300
+        this.body.position.set(this.x, h, this.z)
+        this.body.rotation.x = Math.PI / 2
+    }
+    update(){
+        this.body.rotation.z += 0.01
+    }
+}
+
+
+function height(x, z, platforms){
+	for(let i = 0; i < platforms.length; i++){
+	    for(let j = platforms[i].num + 1; j > 0 ; j--){
+	        if(x <= (platforms[i].length - platforms[i].spacing * (j - 1)) / 2 + platforms[i].floor.position.x && z <= (platforms[i].width - platforms[i].spacing * (j - 1)) / 2 + platforms[i].floor.position.z && x >= ((platforms[i].length - platforms[i].spacing * (j - 1)) / 2) * -1 + platforms[i].floor.position.x && z >= ((platforms[i].width - platforms[i].spacing * (j - 1)) / 2) * -1 + platforms[i].floor.position.z) return platforms[i].high * j
+	/*
+	    else if(x <= 255 && z <= 255 && x >= -255 && z >= -255) return 100
+	    else if(x <= 270 && z <= 270 && x >= -270 && z >= -270) return 75
+	    else if(x <= 285 && z <= 285 && x >= -285 && z >= 285) return 50
+	    else if(x <= 300 && z <= 300 && x >= -300 && z >= -300) return 25
+	    else return 0
+	*/
+	    }
+	}
+	return 0;
+}
+
+function checkTreasure(treasures){
+	for(let i = 0; i < treasures.length; i++){
+	    if(treasures[i].x - marioWrap.md2.root.position.x < 30 && treasures[i].z - marioWrap.md2.root.position.z < 30){
+	        get.play()
+	        treasures[i].body.material.visible = false
+	        for(let j = i; j < treasures.length - 1; j++)
+		treasures[j] = treasures[j + 1]
+	        treasures.length -= 1
+	        return;
+	    }
+	}
+}
+
+var SCREEN_WIDTH = window.innerWidth;
+var SCREEN_HEIGHT = window.innerHeight;
+
+var container, stats;
+var camera, scene, renderer;
+
+var marioWrap, platforms = [], treasures = [];
+var light;
+
+var cameraControls;
+var clock = new THREE.Clock();
+var get = document.getElementById("getTreasure");
+
+
+init();
+animate();
+
+function init() {
+
+	container = document.createElement( 'div' );
+	document.body.appendChild( container );
+
+	// CAMERA
+
+	camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 4000 );
+	camera.position.set( 0, 150, 1300 );
+
+	// SCENE
+
+	scene = new THREE.Scene();
+	scene.background = new THREE.Color( 0xffffff );
+	scene.fog = new THREE.Fog( 0xffffff, 1000, 4000 );
+
+	scene.add( camera );
+
+	// LIGHTS
+
+	scene.add( new THREE.AmbientLight( 0x222222 ) );
+
+	light = new THREE.DirectionalLight( 0xffffff, 2.25 );
+	light.position.set( 200, 450, 500 );
+
+	light.castShadow = true;
+
+	light.shadow.mapSize.width = 1024;
+	light.shadow.mapSize.height = 512;
+
+	light.shadow.camera.near = 100;
+	light.shadow.camera.far = 1200;
+
+	light.shadow.camera.left = -1000;
+	light.shadow.camera.right = 1000;
+	light.shadow.camera.top = 350;
+	light.shadow.camera.bottom = -350;
+
+	scene.add( light );
+	//scene.add( new THREE.CameraHelper( light.shadow.camera ) );
+
+	//  GROUND
+
+	var gt = new THREE.TextureLoader().load( "https://i.imgur.com/AUfV4WZ.jpg" );
+	var gg = new THREE.PlaneBufferGeometry( 16000, 16000 );
+	var gm = new THREE.MeshPhongMaterial( { color: 0xffffff, map: gt } );
+
+	var ground = new THREE.Mesh( gg, gm );
+	ground.rotation.x = - Math.PI / 2;
+	ground.material.map.repeat.set( 64, 64 );
+	ground.material.map.wrapS = THREE.RepeatWrapping;
+	ground.material.map.wrapT = THREE.RepeatWrapping;
+	// note that because the ground does not cast a shadow, .castShadow is left false
+	ground.receiveShadow = true;
+
+	scene.add( ground );
+	
+	let axes = new THREE.AxisHelper (100)
+	scene.add (axes)
+
+	// RENDERER
+
+	renderer = new THREE.WebGLRenderer( { antialias: true } );
+	renderer.setPixelRatio( window.devicePixelRatio );
+	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+	container.appendChild( renderer.domElement );
+
+	renderer.gammaInput = true;
+	renderer.gammaOutput = true;
+
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+
+	// EVENTS
+
+	window.addEventListener( 'resize', onWindowResize, false );
+	document.addEventListener( 'keydown', onKeyDown, false );
+	document.addEventListener( 'keyup', onKeyUp, false );
+
+	// CONTROLS
+
+	cameraControls = new THREE.OrbitControls( camera, renderer.domElement );
+	cameraControls.target.set( 0, 50, 0 );
+	cameraControls.update();
+
+//////////////////////////////////////////////////////////////////////////
+
+	let configMario = {
+
+		baseUrl: "md2models/ogro/",
+
+		body: "ogro.md2",
+		skins: [ "grok.jpg" ],
+		weapons:  [ ["weapon.md2", "weapon.jpg"] ],
+
+		animations: {
+			move: "run",
+			idle: "stand",
+			jump: "jump",
+			attack: "attack",
+			//crouchMove: "crwalk",
+			//crouchIdle: "crstand",
+			//crouchAttach: "crattack"
+		},
+
+		walkSpeed: 350, //translation speed
+		crouchSpeed: 175
+
+	};
+
+	let controlsMario = {
+
+		moveForward: false,
+		moveBackward: false,
+		moveLeft: false,
+		moveRight: false
+
+	};
+
+	marioWrap = new MD2Wrapper (configMario, controlsMario, new THREE.Vector3(), 3 );
+
+	var gyro = new THREE.Gyroscope();  
+	gyro.add( camera );
+	
+	gyro.add( light, light.target );
+	gyro.scale.set (0.51,.51,.51)
+	//gyro.position.set (300,300,300)
+	marioWrap.md2.root.add( gyro );		
+
+	////-------------------------------
+	let platform = new Platform(600, 600, 25, 4, 30, 500, 500)
+	platforms.push(platform)
+	scene.add(platform.floor)
+
+	platform = new Platform(800, 800, 25, 8, 60, -500, -500)
+	platforms.push(platform)
+	scene.add(platform.floor)
+
+	let treasure = new Treasure(500, 500)
+	treasures.push(treasure)
+	scene.add(treasure.body)
+
+	treasure = new Treasure(-500, -500)
+	treasures.push(treasure)
+	scene.add(treasure.body)
+	
+}
+			
+function jsonCopy (src) {
+	return JSON.parse (JSON.stringify (src))
+}
+
+// EVENT HANDLERS
+
+function onWindowResize( event ) {
+
+	SCREEN_WIDTH = window.innerWidth;
+	SCREEN_HEIGHT = window.innerHeight;
+
+	renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
+
+	camera.aspect = SCREEN_WIDTH/ SCREEN_HEIGHT;
+	camera.updateProjectionMatrix();
+
+}
+
+function onKeyDown ( event ) {
+
+	event.stopPropagation();
+
+	let controlsM = marioWrap.md2.controls;
+	
+	switch( event.keyCode ) {
+
+		case 87: /*W*/ 	controlsM.moveForward = true; break;
+
+		case 83: /*S*/ 	 controlsM.moveBackward = true; break;
+
+		case 65: /*A*/   controlsM.moveLeft = true; break;
+
+		case 68: /*D*/    controlsM.moveRight = true; break;
+
+		case 67: /*C*/     controlsM.crouch = true; break;
+		case 32: /*space*/ controlsM.jump = true; checkTreasure(treasures); break;
+		case 17: /*ctrl*/  controlsM.attack = true; break;
+
+	}
+
+}
+
+function onKeyUp ( event ) {
+
+	event.stopPropagation();
+
+	let controlsM = marioWrap.md2.controls;
+	switch( event.keyCode ) {
+
+		case 87: /*W*/ 	controlsM.moveForward = false; break;
+
+		case 83: /*S*/ 	 controlsM.moveBackward = false; break;
+
+		case 65: /*A*/   controlsM.moveLeft = false; break;
+
+		case 68: /*D*/    controlsM.moveRight = false; break;
+
+		case 67: /*C*/     controlsM.crouch = false; break;
+		case 32: /*space*/ controlsM.jump = false; break;
+		case 17: /*ctrl*/  controlsM.attack = false; break;
+
+	}
+
+}
+
+//
+
+function animate() {
+
+	requestAnimationFrame( animate );
+	render();
+
+}
+
+function render() {
+
+	var delta = clock.getDelta();
+	if (marioWrap.md2) {
+	    let h = height(marioWrap.md2.root.position.x, marioWrap.md2.root.position.z, platforms)
+	    marioWrap.md2.update(delta)
+	    marioWrap.md2.root.position.y = 72.75 + h
+	    //console.log(platform.floor.position.x)
+	}
+	for(let i = 0; i < treasures.length; i++)
+	    treasures[i].update()
+	renderer.render( scene, camera );
+
+}
+
+</script>
+
+</body>
+</html>
