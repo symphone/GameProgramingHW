@@ -8,7 +8,7 @@
 
 <body> 
 <div id="info">Agent (Seek, Arrival, Collision)<br>
-<span id="time">00:00</span>
+<span id="timer">00:00</span>
 <p id="message"></p>
 </div>
 
@@ -26,7 +26,7 @@
 
 <script src="./main.js"></script>
 <script>
-var start=Date.now(),r=document.getElementById('time');
+var start=Date.now(),r=document.getElementById('timer');
 (function f(){
  var diff=Date.now()-start,ns=((diff/1000)>>0),m=(ns/60)>>0,s=ns-m*60;
  r.textContent=m+':'+((''+s).length>1?'':'0')+s;

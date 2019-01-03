@@ -1,3 +1,4 @@
+import {scene} from './threemain.js';
 function agentMesh (size, colorName='red') {
 	// mesh facing +x
 	let geometry = new THREE.Geometry();
@@ -13,76 +14,82 @@ function agentMesh (size, colorName='red') {
 	  geometry.computeFaceNormals()
 	
 	return new THREE.Mesh (geometry, 
-	     new THREE.MeshBasicMaterial({color:colorName, wireframe:true}))  
+	     new THREE.MeshBasicMaterial({color:'red', wireframe:true}))  
 }
 
 class Agent {
   constructor(pos, halfSize) {
-  	this.name = "I3B14";
+  	this.name = "I3B18+14";
     this.pos = pos.clone();
     this.vel = new THREE.Vector3();
     this.force = new THREE.Vector3();
     this.target = null;
     this.halfSize = halfSize;  // half width
     this.mesh = agentMesh (this.halfSize, 'cyan');
-    this.MAXSPEED = 200;
+    this.MAXSPEED = 150;
     this.ARRIVAL_R = 20;
-    
-    this.score = 0;
+    this.score = 0
     
     // for orientable agent
     this.angle = 0;
     scene.add (this.mesh);
+
+  this.time = 0;
   }
   
   update(dt) {
   
   	// about target ...
-  	if (this.target === null || this.target.found === true) {  // no more target OR target found by other agent
+	if (this.target === null || this.target.found === true) {  // no more target OR target found by other agent
   	  console.log ('find target')
   		this.findTarget();
   		return;  // wait for next turn ...
   	}
+
+  	/*if (! this.target) {  // no target
+  	  console.log ('find target')
+  		this.findTarget();
+  		return;  // wait for next turn ...
+  	}
+    if(this.target.found == true){
+        this.target = null;
+        return;
+    }*/
   	
     this.accumulateForce();
     
     // collision
     // for all obstacles in the scene
     let obs = scene.obstacles;
-
     // pick the most threatening one
     // apply the repulsive force
     // (write your code here)
-	const REACH = 350
-	const K = 10
-	//let perp = new THREE.Vector3()
-	let size = 3
-	let projMin = 99, min
-	let vhat = this.vel.clone().normalize()
-	for(let i = 0; i < obs.length; i++){
-		let point = obs[i].center.clone().sub(this.pos)
-		let proj = point.dot(vhat)
-		let perp = new THREE.Vector3().subVectors(point, vhat.clone().setLength(proj))
-		let overlap = obs[i].size + size - perp.length()
-		if(overlap > 0){
-			if(projMin > proj){
-				projMin = proj
-				min = i
-			}
-		}
-	}
-	//console.log(min)
-	if(min != undefined){
-	    let point = obs[min].center.clone().sub(this.pos)
-	    let proj = point.dot(vhat)
-	    let perp = new THREE.Vector3().subVectors(point, vhat.clone().setLength(proj))
-	    let overlap = obs[min].size + size - perp.length()
-	    if(overlap > 0){
-	        perp.setLength(K * overlap)
-	        this.force.sub(perp)
-	    }
-	}
+
+    for(let i = 0; i < obs.length; i++){
+		
+    let vhat = this.vel.clone().normalize();
+    let point = obs[i] .center.clone().sub(this.pos);
+    let proj = point.dot(vhat);
+const REACH = 300;
+const K = 15;
 	
+    if( proj > 0 && proj < REACH /*&& proj < minProj */){
+	
+	//minProj = proj;
+	let perp = new THREE.Vector3();
+	perp.subVectors(point, vhat.clone().setLength(proj));
+	let overlap =  obs[i].size + this.halfSize - perp.length();
+	if( overlap > 0 ){
+		perp.setLength(K*overlap);
+		perp.negate();
+		//minPerp.copy(perp);
+		this.force.add(perp);
+		//console.log("hit: ", perp);
+	}
+    }
+   }
+//this.force.add(minPerp );
+
 	// Euler's method       
     this.vel.add(this.force.clone().multiplyScalar(dt));
 
@@ -94,6 +101,7 @@ class Agent {
       this.vel.setLength(dst)
       const REACH_TARGET = 5;
       if (dst < REACH_TARGET) {// target reached
+      	//debugger;
       	console.log ('target reached');
          this.target.setFound (this);
          this.target = null;
@@ -110,8 +118,9 @@ class Agent {
 	    	this.angle = Math.atan2 (-this.vel.z, this.vel.x)
     		this.mesh.rotation.y = this.angle
    	}
-  }
-
+	
+     }
+ 
   findTarget () {
   	console.log ('total: ' + scene.targets.length)
   	let allTargets = scene.targets;
@@ -127,7 +136,7 @@ class Agent {
   }
   
   setTarget(target) {
-    this.target = target;
+    this.target = target
   }
   targetInducedForce(targetPos) {
     return targetPos.clone().sub(this.pos).normalize().multiplyScalar(this.MAXSPEED).sub(this.vel)
@@ -137,5 +146,6 @@ class Agent {
     // seek
     this.force.copy(this.targetInducedForce(this.target.pos));
   }
-
+ 
 }
+export {Agent};

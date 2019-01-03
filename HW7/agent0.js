@@ -1,3 +1,5 @@
+import {scene} from './threemain.js';
+
 function agentMesh (size, colorName='red') {
 	// mesh facing +x
 	let geometry = new THREE.Geometry();
@@ -25,8 +27,9 @@ class Agent {
     this.target = null;
     this.halfSize = halfSize;  // half width
     this.mesh = agentMesh (this.halfSize, 'cyan');
-    this.MAXSPEED = 200;
+    this.MAXSPEED = 150;
     this.ARRIVAL_R = 20;
+    this.score = 0
     
     this.score = 0;
     
@@ -139,3 +142,4 @@ class Agent {
   }
 
 }
+export {Agent};
