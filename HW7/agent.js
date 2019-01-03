@@ -27,9 +27,8 @@ class Agent {
     this.halfSize = halfSize;  // half width
     this.mesh = agentMesh (this.halfSize, 'cyan');
     this.MAXSPEED = 150;
-    this.ARRIVAL_R = 20;
-    this.score = 0
-    
+    this.ARRIVAL_R = 25;
+    this.score = 0;
     // for orientable agent
     this.angle = 0;
     scene.add (this.mesh);
@@ -40,21 +39,11 @@ class Agent {
   update(dt) {
   
   	// about target ...
-	if (this.target === null || this.target.found === true) {  // no more target OR target found by other agent
+  	if (this.target === null || this.target.found === true) {  // no more target OR target found by other agent
   	  console.log ('find target')
   		this.findTarget();
   		return;  // wait for next turn ...
   	}
-
-  	/*if (! this.target) {  // no target
-  	  console.log ('find target')
-  		this.findTarget();
-  		return;  // wait for next turn ...
-  	}
-    if(this.target.found == true){
-        this.target = null;
-        return;
-    }*/
   	
     this.accumulateForce();
     
@@ -70,8 +59,8 @@ class Agent {
     let vhat = this.vel.clone().normalize();
     let point = obs[i] .center.clone().sub(this.pos);
     let proj = point.dot(vhat);
-const REACH = 300;
-const K = 15;
+const REACH = 450
+const K = 5;
 	
     if( proj > 0 && proj < REACH /*&& proj < minProj */){
 	
@@ -120,7 +109,7 @@ const K = 15;
    	}
 	
      }
- 
+  
   findTarget () {
   	console.log ('total: ' + scene.targets.length)
   	let allTargets = scene.targets;

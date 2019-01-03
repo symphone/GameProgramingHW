@@ -1,5 +1,4 @@
 import {scene} from './threemain.js';
-
 function agentMesh (size, colorName='red') {
 	// mesh facing +x
 	let geometry = new THREE.Geometry();
@@ -28,8 +27,7 @@ class Agent {
     this.halfSize = halfSize;  // half width
     this.mesh = agentMesh (this.halfSize, 'cyan');
     this.MAXSPEED = 150;
-    this.ARRIVAL_R = 20;
-    this.score = 0
+    this.ARRIVAL_R = 25;
     
     this.score = 0;
     
@@ -57,7 +55,7 @@ class Agent {
     // apply the repulsive force
     // (write your code here)
 	const REACH = 350
-	const K = 10
+	const K = 5
 	//let perp = new THREE.Vector3()
 	let size = 3
 	let projMin = 99, min
